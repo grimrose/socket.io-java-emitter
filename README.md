@@ -1,6 +1,8 @@
 socket.io-java-emitter
 ======================
 
+[![Build Status](https://travis-ci.org/grimrose/socket.io-java-emitter.svg?branch=master)](https://travis-ci.org/grimrose/socket.io-java-emitter)
+
 A Java implementation of socket.io-emitter
 
 **To use this module you must have a [Redis][redis] instance running on your network.**
