@@ -26,11 +26,11 @@ class EmitterAndNodeRedisSpec extends Specification {
             def redis = new Jedis("localhost")
             pubLatch.await()
 
-            def emitter = Emitter.getInstance(publisherOf(redis), Emitter.DEFAULT_KEY)
+            def emitter = SpecHelper.emitter(redis, Emitter.DEFAULT_KEY)
             emitter.emit("broadcast event", "broadcast payload")
         }
 
-        def subscriber = new EmitterAndRedisSpec.Subscriber()
+        def subscriber = new Subscriber()
         Thread.start {
             def redis = new Jedis("localhost")
             redis.subscribe(subscriber, "spock")
@@ -58,11 +58,11 @@ class EmitterAndNodeRedisSpec extends Specification {
             def redis = new Jedis("localhost")
             pubLatch.await()
 
-            def emitter = Emitter.getInstance(publisherOf(redis), Emitter.DEFAULT_KEY)
+            def emitter = SpecHelper.emitter(redis, Emitter.DEFAULT_KEY)
             emitter.of('/nsp').broadcast().emit('broadcast event', 'nsp broadcast payload')
         }
 
-        def subscriber = new EmitterAndRedisSpec.Subscriber()
+        def subscriber = new Subscriber()
         Thread.start {
             def redis = new Jedis("localhost")
             redis.subscribe(subscriber, "spock")
@@ -76,21 +76,6 @@ class EmitterAndNodeRedisSpec extends Specification {
 
         then:
         subscriber.result.toString().contains('nsp broadcast payload')
-    }
-
-
-    def publisherOf = { Jedis redis ->
-        new RedisPublisher() {
-            @Override
-            Long publish(byte[] channel, byte[] message) {
-                redis.publish(channel, message)
-            }
-
-            @Override
-            Long publish(String channel, String message) {
-                redis.publish(channel, message)
-            }
-        }
     }
 
 }
