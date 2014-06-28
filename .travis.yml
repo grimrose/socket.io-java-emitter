@@ -4,5 +4,11 @@ jdk:
   - openjdk7
   - oraclejdk7
 
+node_js:
+  - "0.10"
+
 services:
   - redis-server
+
+before_install:
+  - npm install --prefix src/test/resources
