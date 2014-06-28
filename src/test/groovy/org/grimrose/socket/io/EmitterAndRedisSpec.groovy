@@ -35,7 +35,7 @@ class EmitterAndRedisSpec extends Specification {
             def redis = new Jedis("localhost")
             pubLatch.await()
 
-            def emitter = Emitter.getInstance(publisherOf(redis), Emitter.DEFAULT_KEY)
+            def emitter = SpecHelper.emitter(redis, Emitter.DEFAULT_KEY)
             emitter.emit("broadcast event", "broadcast payload")
         }
 
@@ -67,7 +67,7 @@ class EmitterAndRedisSpec extends Specification {
             def redis = new Jedis("localhost")
             pubLatch.await()
 
-            def emitter = Emitter.getInstance(publisherOf(redis), Emitter.DEFAULT_KEY)
+            def emitter = SpecHelper.emitter(redis, Emitter.DEFAULT_KEY)
             emitter.emit("AB".bytes, "海老".bytes)
         }
 
@@ -86,21 +86,6 @@ class EmitterAndRedisSpec extends Specification {
         then:
         subscriber.result.toString().contains('AB')
         subscriber.result.toString().contains('海老')
-    }
-
-
-    def publisherOf = { Jedis redis ->
-        new RedisPublisher() {
-            @Override
-            Long publish(byte[] channel, byte[] message) {
-                redis.publish(channel, message)
-            }
-
-            @Override
-            Long publish(String channel, String message) {
-                redis.publish(channel, message)
-            }
-        }
     }
 
 
