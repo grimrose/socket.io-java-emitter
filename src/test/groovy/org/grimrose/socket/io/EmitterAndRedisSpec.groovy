@@ -104,14 +104,14 @@ class EmitterAndRedisSpec extends Specification {
         }
     }
 
-    
+
     static class Subscriber extends JedisPubSub {
 
         def result = []
 
         @Override
         void onMessage(String channel, String message) {
-            println message
+            println "channel: $channel\tmessage: $message"
             result << message
         }
 
