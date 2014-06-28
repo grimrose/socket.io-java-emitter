@@ -5,6 +5,7 @@ import spock.lang.Specification
 import spock.lang.Timeout
 
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 class EmitterAndNodeRedisSpec extends Specification {
@@ -22,20 +23,25 @@ class EmitterAndNodeRedisSpec extends Specification {
         def pubLatch = new CountDownLatch(1)
         def latch = new CountDownLatch(1)
 
-        Thread.start {
-            def redis = new Jedis("localhost")
-            pubLatch.await()
-
-            def emitter = SpecHelper.emitter(redis, Emitter.DEFAULT_KEY)
-            emitter.emit("broadcast event", "broadcast payload")
-        }
-
         def subscriber = new Subscriber()
-        Thread.start {
-            def redis = new Jedis("localhost")
-            redis.subscribe(subscriber, "spock")
-            latch.countDown()
-        }
+
+        def service = Executors.newFixedThreadPool(2)
+
+        def pub = new Jedis("localhost")
+        def sub = new Jedis("localhost")
+
+        [
+                {
+                    pubLatch.await()
+
+                    def emitter = SpecHelper.emitter(pub, Emitter.DEFAULT_KEY)
+                    emitter.emit("broadcast event", "broadcast payload")
+                },
+                {
+                    sub.subscribe(subscriber, "spock")
+                    latch.countDown()
+                },
+        ].each { service.execute(it as Runnable) }
 
         when:
         pubLatch.countDown()
@@ -45,6 +51,11 @@ class EmitterAndNodeRedisSpec extends Specification {
         then:
         subscriber.result.toString().contains('broadcast event')
         subscriber.result.toString().contains('broadcast payload')
+
+        cleanup:
+        service.shutdown()
+        pub.quit()
+        sub.quit()
     }
 
 
@@ -54,20 +65,24 @@ class EmitterAndNodeRedisSpec extends Specification {
         def pubLatch = new CountDownLatch(1)
         def latch = new CountDownLatch(1)
 
-        Thread.start {
-            def redis = new Jedis("localhost")
-            pubLatch.await()
-
-            def emitter = SpecHelper.emitter(redis, Emitter.DEFAULT_KEY)
-            emitter.of('/nsp').broadcast().emit('broadcast event', 'nsp broadcast payload')
-        }
+        def pub = new Jedis("localhost")
+        def sub = new Jedis("localhost")
 
         def subscriber = new Subscriber()
-        Thread.start {
-            def redis = new Jedis("localhost")
-            redis.subscribe(subscriber, "spock")
-            latch.countDown()
-        }
+
+        def service = Executors.newFixedThreadPool(2)
+        [
+                {
+                    pubLatch.await()
+
+                    def emitter = SpecHelper.emitter(pub, Emitter.DEFAULT_KEY)
+                    emitter.of('/nsp').broadcast().emit('broadcast event', 'nsp broadcast payload')
+                },
+                {
+                    sub.subscribe(subscriber, "spock")
+                    latch.countDown()
+                },
+        ].each { service.execute(it as Runnable) }
 
         when:
         pubLatch.countDown()
@@ -76,6 +91,11 @@ class EmitterAndNodeRedisSpec extends Specification {
 
         then:
         subscriber.result.toString().contains('nsp broadcast payload')
+
+        cleanup:
+        service.shutdown()
+        pub.quit()
+        sub.quit()
     }
 
 }

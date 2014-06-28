@@ -30,3 +30,5 @@ dependencies {
 wrapper {
     gradleVersion = '1.12'
 }
+
+test.testLogging { exceptionFormat "full" }
