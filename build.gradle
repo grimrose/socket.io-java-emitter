@@ -35,6 +35,7 @@ dependencies {
     compile "org.scala-lang:scala-compiler:$scalaFullVersion"
     testCompile "net.debasishg:redisclient_$scalaVersion:2.13"
     testCompile "org.scalatest:scalatest_$scalaVersion:2.2.0"
+    testCompile "com.typesafe.akka:akka-testkit_$scalaVersion:2.3.2"
 
 }
 
