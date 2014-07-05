@@ -1,6 +1,8 @@
 package org.grimrose.socket.io
 
 
+import java.lang.Long
+
 import akka.actor._
 import akka.testkit.{DefaultTimeout, ImplicitSender, TestKit}
 import com.redis._
@@ -17,10 +19,6 @@ class EmitterAndScalaRedisSpec
   with DefaultTimeout with ImplicitSender with WordSpecLike with Matchers with BeforeAndAfterAll {
 
   import org.grimrose.socket.io.EmitterAndScalaRedisSpec._
-
-  val sub = system.actorOf(Props(classOf[Sub], testActor))
-  val pub = system.actorOf(Props[Pub])
-
 
   override def afterAll() = {
     shutdown()
@@ -43,25 +41,54 @@ class EmitterAndScalaRedisSpec
 
   "Redis Subscriber" should {
     "be subscribed message" in {
+      val pub = system.actorOf(Props[Pub])
+      val sub = system.actorOf(Props(classOf[Sub], testActor))
+
       var messages = Seq[String]()
-      within(6.second) {
+      within(4.second) {
         sub ! SubscribeCommand(List(Emitter.DEFAULT_KEY))
-        awaitAssert(expectMsg(true), 1.second, 100.millisecond)
+        awaitAssert(expectMsg(true), 1.second)
+
         pub ! PublishCommand(Emitter.DEFAULT_KEY, "hello")
-        awaitAssert(expectMsg("hello"), 2.second, 100.millisecond)
+        awaitAssert(expectMsg(true), 2.second)
 
-        sub ! UnSubCommand(List(Emitter.DEFAULT_KEY))
-        awaitAssert(expectMsg(true), 2.second, 100.millisecond)
-
-        receiveWhile(6.second) {
+        receiveWhile(4.second) {
           case msg: String => messages = msg +: messages
         }
       }
+      sub ! UnSubscribeCommand
+
       messages.length should be(1)
       messages should be(Seq("hello"))
 
-      pub ! ShutdownCommand
-      sub ! ShutdownCommand
+      pub ! QuitCommand
+    }
+  }
+
+  "Emitter" should {
+    "be able to emit string messages to subscriber" in {
+      val emit = system.actorOf(Props[Emit])
+      val sub = system.actorOf(Props(classOf[Sub], testActor))
+
+      var messages = Seq[String]()
+      within(5.second) {
+        sub ! SubscribeCommand(List(Emitter.DEFAULT_KEY))
+        awaitCond(expectMsg(true))
+
+        emit ! EmitCommand
+        awaitCond(expectMsg(true))
+
+        receiveWhile(5.second) {
+          case msg: String => messages = msg +: messages
+        }
+      }
+
+      sub ! UnSubscribeCommand
+
+      messages.length should be(1)
+      messages.contains("broadcast event", "broadcast payload") should be(equal(true))
+
+      emit ! QuitCommand
     }
   }
 
@@ -77,75 +104,105 @@ object EmitterAndScalaRedisSpec {
 
   case class PublishCommand(channel: String, message: String)
 
+  case object EmitCommand
+
   case class SubscribeCommand(channels: List[String])
 
-  case class UnSubCommand(channels: List[String])
+  case object UnSubscribeCommand
 
-  case object ShutdownCommand
+  case object QuitCommand
 
 
   class Pub extends Actor with ActorLogging {
     val redis = new RedisClient()
 
-    val publisher = context.actorOf(Props(new Publisher(redis)), "publisher")
+    val publisher = context.actorOf(Props(new Publisher(redis)))
 
     def receive = {
       case PublishCommand(channel, message) =>
-        publish(channel, message)
-        sender ! message
+        publisher ! Publish(channel, message)
+        sender ! true
 
-      case ShutdownCommand =>
+      case QuitCommand =>
         redis.quit
         sender ! true
 
       case x =>
-        log.debug("receive in Pub " + x)
+        log.debug("receive in Pub: " + x)
         sender ! x
     }
 
-    override def postStop() {
-      redis.disconnect
+    override def preStart() = {
+      log.debug("start Pub.")
     }
 
-    def publish(channel: String, message: String) = {
-      publisher ! Publish(channel, message)
+    override def postStop() = {
+      redis.quit
+      log.debug("stop Pub.")
     }
+
+  }
+
+  class Emit extends Actor with ActorLogging with RedisPublisher {
+    val redis = new RedisClient()
+
+    val emitter = Emitter.getInstance(this, Emitter.DEFAULT_KEY)
+
+    def receive = {
+      case EmitCommand =>
+        emitter.emit("broadcast event", "broadcast payload")
+        log.debug("emit")
+        sender ! true
+
+      case QuitCommand =>
+        redis.quit
+        sender ! true
+
+      case x =>
+        log.debug("receive in Emit: " + x)
+        sender ! x
+    }
+
+    override def publish(channel: Array[Byte], message: Array[Byte]): Long = {
+      throw new UnsupportedOperationException("scala redis client does not support binary publishing.")
+    }
+
+    override def publish(channel: String, message: String): Long = {
+      redis.publish(channel, message) match {
+        case Some(x) => x
+        case None => -1
+      }
+    }
+
+    override def preStart() = {
+      log.debug("start Emit.")
+    }
+
+    override def postStop() = {
+      redis.quit
+      log.debug("stop Emit.")
+    }
+
   }
 
   class Sub(next: ActorRef) extends Actor with ActorLogging {
     val redis = new RedisClient()
 
-    val subscriber = context.actorOf(Props(new com.redis.Subscriber(redis)), "subscriber")
+    val subscriber = context.actorOf(Props(new com.redis.Subscriber(redis)))
     subscriber ! Register(callback)
 
     def receive = {
       case SubscribeCommand(channels) =>
-        subscribe(channels)
+        subscriber ! Subscribe(channels.toArray)
         sender ! true
 
-      case UnSubCommand(channels) =>
-        unsubscribe(channels)
-        sender ! true
-
-      case ShutdownCommand =>
-        redis.quit
+      case UnSubscribeCommand =>
+        subscriber ! UnsubscribeAll
         sender ! true
 
       case x =>
-        log.debug("receive in Sub " + x)
+        log.debug("receive in Sub: " + x)
         sender ! x
-    }
-
-    override def postStop() {
-      redis.disconnect
-    }
-
-    def subscribe(channels: List[String]) = {
-      subscriber ! Subscribe(channels.toArray)
-    }
-
-    def unsubscribe(channels: List[String]) = {
-      subscriber ! Unsubscribe(channels.toArray)
     }
 
     def callback(pubsub: PubSubMessage) = pubsub match {
@@ -157,6 +214,14 @@ object EmitterAndScalaRedisSpec {
         next ! msg
     }
 
+    override def preStart() = {
+      log.debug("start Sub.")
+    }
+
+    override def postStop() = {
+      redis.quit
+      log.debug("stop Sub.")
+    }
   }
 
 }
