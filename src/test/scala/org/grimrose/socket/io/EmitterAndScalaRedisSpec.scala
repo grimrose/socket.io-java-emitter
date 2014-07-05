@@ -44,16 +44,16 @@ class EmitterAndScalaRedisSpec
   "Redis Subscriber" should {
     "be subscribed message" in {
       var messages = Seq[String]()
-      within(6 second) {
+      within(6.second) {
         sub ! SubscribeCommand(List(Emitter.DEFAULT_KEY))
-        awaitAssert(expectMsg(true), 1 second)
+        awaitAssert(expectMsg(true), 1.second, 100.millisecond)
         pub ! PublishCommand(Emitter.DEFAULT_KEY, "hello")
-        awaitAssert(expectMsg("hello"), 2 second)
+        awaitAssert(expectMsg("hello"), 2.second, 100.millisecond)
 
         sub ! UnSubCommand(List(Emitter.DEFAULT_KEY))
-        awaitAssert(expectMsg(true), 3 second)
+        awaitAssert(expectMsg(true), 2.second, 100.millisecond)
 
-        receiveWhile(6 second) {
+        receiveWhile(6.second) {
           case msg: String => messages = msg +: messages
         }
       }
