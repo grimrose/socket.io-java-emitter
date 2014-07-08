@@ -4,7 +4,7 @@ package org.grimrose.socket.io
 import java.lang.Long
 
 import akka.actor._
-import akka.testkit.{DefaultTimeout, ImplicitSender, TestKit}
+import akka.testkit._
 import com.redis._
 import com.typesafe.config.ConfigFactory
 import org.junit.runner.RunWith
@@ -68,9 +68,10 @@ class EmitterAndScalaRedisSpec
   "Emitter" should {
     "be able to emit string messages to subscriber" in {
       val emit = system.actorOf(Props[Emit])
-      val sub = system.actorOf(Props(classOf[Sub], testActor))
 
-      var messages = Seq[String]()
+      val probe = TestProbe()
+      val sub = system.actorOf(Props(classOf[Sub], probe.ref))
+
       within(5.second) {
         sub ! SubscribeCommand(List(Emitter.DEFAULT_KEY))
         awaitCond(expectMsg(true))
@@ -78,16 +79,12 @@ class EmitterAndScalaRedisSpec
         emit ! EmitCommand
         awaitCond(expectMsg(true))
 
-        receiveWhile(5.second) {
-          case msg: String => messages = msg +: messages
-        }
+        val message = probe.receiveOne(1.second).toString
+        message should include("broadcast event")
+        message should include("broadcast payload")
       }
 
       sub ! UnSubscribeCommand
-
-      messages.length should be(1)
-      messages.contains("broadcast event", "broadcast payload") should be(equal(true))
-
       emit ! QuitCommand
     }
   }
