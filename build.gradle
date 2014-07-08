@@ -1,11 +1,17 @@
-apply plugin: 'groovy'
-
 apply plugin: 'idea'
+
+apply {
+    plugin 'groovy'
+    plugin 'scala'
+}
+
 
 group = 'org.grimrose'
 project.ext {
     artifactId = 'socket.io-java-emitter'
     jdkVersion = '1.7'
+    scalaVersion = "2.11"
+    scalaFullVersion = "${scalaVersion}.1"
 }
 version = '0.1-SNAPSHOT'
 
@@ -25,6 +31,12 @@ dependencies {
 
     testCompile 'redis.clients:jedis:2.5.1'
     testCompile 'org.spockframework:spock-core:1.0-groovy-2.0-SNAPSHOT'
+
+    compile "org.scala-lang:scala-compiler:$scalaFullVersion"
+    testCompile "net.debasishg:redisclient_$scalaVersion:2.13"
+    testCompile "org.scalatest:scalatest_$scalaVersion:2.2.0"
+    testCompile "com.typesafe.akka:akka-testkit_$scalaVersion:2.3.2"
+
 }
 
 wrapper {
@@ -32,3 +44,8 @@ wrapper {
 }
 
 test.testLogging { exceptionFormat "full" }
+
+tasks.withType(ScalaCompile) {
+    scalaCompileOptions.useAnt = false
+    scalaCompileOptions.additionalParameters = ['-feature']
+}
