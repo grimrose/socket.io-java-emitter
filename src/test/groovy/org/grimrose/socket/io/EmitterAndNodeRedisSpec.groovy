@@ -1,6 +1,8 @@
 package org.grimrose.socket.io
 
-import redis.clients.jedis.Jedis
+import redis.clients.jedis.JedisPool
+import redis.clients.jedis.JedisPoolConfig
+import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Timeout
 
@@ -10,12 +12,22 @@ import java.util.concurrent.TimeUnit
 
 class EmitterAndNodeRedisSpec extends Specification {
 
+    @Shared
+    JedisPool pool
+
     def setupSpec() {
+        pool = new JedisPool(new JedisPoolConfig(), "localhost");
+
         def process = ["node", "src/test/resources/node_redis_client.js"].execute()
         Runtime.runtime.addShutdownHook({
             process.destroy()
         })
     }
+
+    def cleanupSpec() {
+        pool.destroy()
+    }
+
 
     @Timeout(5)
     def "should be able to emit messages to client"() {
@@ -27,8 +39,8 @@ class EmitterAndNodeRedisSpec extends Specification {
 
         def service = Executors.newFixedThreadPool(2)
 
-        def pub = new Jedis("localhost")
-        def sub = new Jedis("localhost")
+        def pub = pool.resource
+        def sub = pool.resource
 
         [
                 {
@@ -54,8 +66,8 @@ class EmitterAndNodeRedisSpec extends Specification {
 
         cleanup:
         service.shutdown()
-        pub.quit()
-        sub.quit()
+        pool.returnResource(pub)
+        pool.returnResource(sub)
     }
 
 
@@ -65,8 +77,8 @@ class EmitterAndNodeRedisSpec extends Specification {
         def pubLatch = new CountDownLatch(1)
         def latch = new CountDownLatch(1)
 
-        def pub = new Jedis("localhost")
-        def sub = new Jedis("localhost")
+        def pub = pool.resource
+        def sub = pool.resource
 
         def subscriber = new Subscriber()
 
@@ -94,8 +106,8 @@ class EmitterAndNodeRedisSpec extends Specification {
 
         cleanup:
         service.shutdown()
-        pub.quit()
-        sub.quit()
+        pool.returnResource(pub)
+        pool.returnResource(sub)
     }
 
 }

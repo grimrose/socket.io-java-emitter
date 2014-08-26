@@ -1,7 +1,11 @@
 package org.grimrose.socket.io
 
+import org.json.JSONArray
+import org.json.JSONObject
 import redis.clients.jedis.BinaryJedisPubSub
-import redis.clients.jedis.Jedis
+import redis.clients.jedis.JedisPool
+import redis.clients.jedis.JedisPoolConfig
+import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Timeout
 
@@ -11,9 +15,21 @@ import java.util.concurrent.TimeUnit
 
 class EmitterAndRedisSpec extends Specification {
 
+    @Shared
+    JedisPool pool
+
+    def setupSpec() {
+        pool = new JedisPool(new JedisPoolConfig(), "localhost");
+    }
+
+    def cleanupSpec() {
+        pool.destroy()
+    }
+
+
     def "should be able to access localhost Redis"() {
         setup:
-        def redis = new Jedis("localhost")
+        def redis = pool.resource
 
         when:
         redis.set("test", "one")
@@ -22,7 +38,7 @@ class EmitterAndRedisSpec extends Specification {
         redis.get("test") == "one"
 
         cleanup:
-        redis?.quit()
+        pool.returnResource(redis)
     }
 
 
@@ -32,8 +48,8 @@ class EmitterAndRedisSpec extends Specification {
         def pubLatch = new CountDownLatch(1)
         def latch = new CountDownLatch(1)
 
-        def pub = new Jedis("localhost")
-        def sub = new Jedis("localhost")
+        def pub = pool.resource
+        def sub = pool.resource
 
         def subscriber = new Subscriber()
 
@@ -62,8 +78,8 @@ class EmitterAndRedisSpec extends Specification {
 
         cleanup:
         service.shutdown()
-        pub.quit()
-        sub.quit()
+        pool.returnResource(pub)
+        pool.returnResource(sub)
     }
 
 
@@ -73,8 +89,8 @@ class EmitterAndRedisSpec extends Specification {
         def pubLatch = new CountDownLatch(1)
         def latch = new CountDownLatch(1)
 
-        def pub = new Jedis("localhost")
-        def sub = new Jedis("localhost")
+        def pub = pool.resource
+        def sub = pool.resource
 
         def subscriber = new BinSubscriber()
 
@@ -104,8 +120,8 @@ class EmitterAndRedisSpec extends Specification {
 
         cleanup:
         service.shutdown()
-        pub.quit()
-        sub.quit()
+        pool.returnResource(pub)
+        pool.returnResource(sub)
     }
 
 
