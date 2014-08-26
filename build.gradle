@@ -11,7 +11,7 @@ project.ext {
     artifactId = 'socket.io-java-emitter'
     jdkVersion = '1.7'
     scalaVersion = "2.11"
-    scalaFullVersion = "${scalaVersion}.1"
+    scalaFullVersion = "${scalaVersion}.2"
 }
 version = '0.1-SNAPSHOT'
 
@@ -30,12 +30,15 @@ dependencies {
     compile 'org.msgpack:msgpack:0.6.11'
 
     testCompile 'redis.clients:jedis:2.5.1'
-    testCompile 'org.spockframework:spock-core:1.0-groovy-2.0-SNAPSHOT'
+    testCompile('org.spockframework:spock-core:1.0-groovy-2.0-SNAPSHOT') {
+        exclude module: 'groovy-all'
+    }
+    testCompile 'org.codehaus.groovy:groovy-all:2.3.6'
 
     compile "org.scala-lang:scala-compiler:$scalaFullVersion"
     testCompile "net.debasishg:redisclient_$scalaVersion:2.13"
-    testCompile "org.scalatest:scalatest_$scalaVersion:2.2.0"
-    testCompile "com.typesafe.akka:akka-testkit_$scalaVersion:2.3.2"
+    testCompile "org.scalatest:scalatest_$scalaVersion:2.2.2"
+    testCompile "com.typesafe.akka:akka-testkit_$scalaVersion:2.3.5"
 
 }
 
