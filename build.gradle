@@ -40,7 +40,7 @@ dependencies {
 }
 
 wrapper {
-    gradleVersion = '1.12'
+    gradleVersion = '2.0'
 }
 
 test.testLogging { exceptionFormat "full" }
