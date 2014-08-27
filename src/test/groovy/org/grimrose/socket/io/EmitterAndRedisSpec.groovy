@@ -1,7 +1,5 @@
 package org.grimrose.socket.io
 
-import org.json.JSONArray
-import org.json.JSONObject
 import redis.clients.jedis.BinaryJedisPubSub
 import redis.clients.jedis.JedisPool
 import redis.clients.jedis.JedisPoolConfig
